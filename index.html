@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Dragon Ludo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Hind:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm dark table. Menu is a single centred column; in play the board sits left
+   with a narrow seat/dice column beside it, stacking under the board on a phone. */
+:root {
+  color-scheme: dark;
+  --bg: #15181f;
+  --panel: #1c2029;
+  --cell: #262b37;
+  --edge: #343a48;
+  --ink: #e7e9ef;
+  --mute: #8990a1;
+  --go: #4dbd98;
+  --seat: #e8667c;
+  --display: "Baloo 2", "Trebuchet MS", "Segoe UI", sans-serif;
+  --body: "Hind", "Segoe UI", system-ui, sans-serif;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.4 var(--body);
+  padding-inline: 16px;
+  padding-block: 16px;
+  box-sizing: border-box;
+}
+*, *::before, *::after { box-sizing: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+#app { max-width: 1040px; margin-inline: auto; min-height: 100%; display: grid; align-items: center; }
+
+/* ---------- menu ---------- */
+#menu { display: flex; flex-direction: column; align-items: center; gap: 26px; padding-block: 16px; }
+.logo { margin: 0; font: 800 clamp(56px, 13vw, 84px)/0.9 var(--display); letter-spacing: 0.04em; display: flex; }
+.sub { margin: -14px 0 0; color: var(--mute); text-align: center; text-wrap: balance; }
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 12px; width: 100%; }
+.mode {
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 14px;
+  min-height: 150px; padding: 26px 10px 20px; border-radius: 18px;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--mute);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.mode:hover { background: var(--cell); color: var(--ink); }
+.mode[aria-checked="true"] { background: var(--cell); border-color: var(--ink); color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.mode .name { font: 700 17px/1.15 var(--display); text-align: center; }
+.pawns { display: grid; grid-auto-flow: column; gap: 9px; align-items: center; min-height: 52px; align-content: center; }
+.pawns[data-n="6"] { grid-auto-flow: row; grid-template-columns: repeat(3, auto); }
+.pawn { --c: var(--edge); --i: #565d6e; width: var(--d, 22px); height: var(--d, 22px); border-radius: 50%;
+  background: radial-gradient(circle, var(--i) 0 38%, var(--c) 40%); }
+.pawns[data-n="2"] .pawn { --d: 32px; }
+.pawns[data-n="6"] .pawn { --d: 20px; }
+
+.colours { display: flex; align-items: center; gap: 14px; min-height: 36px; color: var(--mute); }
+.swatches { display: flex; gap: 6px; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 2px solid transparent; }
+.swatch::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); transition: transform 0.15s; }
+.swatch:hover::before { transform: scale(1.12); }
+.swatch[aria-checked="true"] { border-color: var(--ink); }
+
+.settings { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.seg { display: flex; padding: 4px; border-radius: 22px; background: var(--panel); border: 1px solid var(--edge); }
+.seg button { padding: 7px 18px; border-radius: 18px; color: var(--mute); font-weight: 500; white-space: nowrap; }
+.seg button[aria-checked="true"] { background: var(--edge); color: var(--ink); }
+.switch { display: flex; align-items: center; gap: 12px; padding: 7px 20px 7px 14px; border-radius: 22px;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--mute); font-weight: 500; }
+.switch:hover { background: var(--cell); }
+.switch i { width: 36px; height: 18px; border-radius: 9px; background: var(--edge); position: relative; transition: background 0.15s; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ink); transition: transform 0.15s; }
+.switch[aria-checked="true"] { color: var(--ink); }
+.switch[aria-checked="true"] i { background: var(--go); }
+.switch[aria-checked="true"] i::after { transform: translateX(18px); }
+.play { min-width: 220px; padding: 11px 32px; border-radius: 28px; background: var(--go); color: var(--bg);
+  font: 700 22px/1.3 var(--display); transition: filter 0.15s; }
+.play:hover { filter: brightness(1.12); }
+.keys { margin: 0; color: #565d6e; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 22px; justify-content: center; }
+@media (hover: none) { .keys { display: none; } }
+
+/* ---------- game ---------- */
+#game { display: flex; flex-wrap: wrap; gap: 20px 28px; justify-content: center; align-items: center; }
+.boardwrap { position: relative; flex: 0 1 auto; width: min(100%, 720px, calc(100vh - 32px)); aspect-ratio: 1; max-width: 100%; }
+#board { width: 100%; height: 100%; display: block; touch-action: manipulation; }
+.win { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(21, 24, 31, 0.72); border-radius: 30px; }
+.win div { background: var(--bg); border: 2px solid var(--seat); border-radius: 26px; padding: 26px 34px; text-align: center;
+  display: grid; gap: 16px; max-width: 86%; }
+.win h2 { margin: 0; font: 800 clamp(30px, 7vw, 44px)/1 var(--display); color: var(--seat); }
+.win .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.btn { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--edge); color: var(--mute); }
+.btn:hover { color: var(--ink); border-color: var(--mute); }
+.btn.solid { background: var(--seat); border-color: var(--seat); color: var(--bg); font-weight: 600; }
+
+.side { flex: 1 1 250px; max-width: 290px; min-width: 0; display: grid; gap: 22px; justify-items: center; }
+.side header { text-align: center; }
+.side h2 { margin: 0; font: 700 26px/1 var(--display); }
+.side header p { margin: 4px 0 0; color: var(--mute); font-size: 14px; }
+.seats { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 4px; }
+.seat { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 7px 14px;
+  border-radius: 14px; color: var(--mute); }
+.seat[aria-current="true"] { background: var(--panel); color: var(--ink); }
+.seat b { display: block; font: 700 16px/1.1 var(--display); }
+.seat small { display: block; font-size: 12.5px; line-height: 1.2; color: #6b7285; }
+.seat[aria-current="true"] small { color: var(--c); }
+.seat .pawn { --d: 22px; }
+.seat svg { display: block; }
+.homes { display: flex; gap: 6px; }
+.homes i { width: 10px; height: 10px; border-radius: 50%; background: var(--edge); }
+.homes i.in { background: var(--c); }
+.dicebox { display: grid; gap: 16px; justify-items: center; }
+.die { width: 84px; height: 84px; border-radius: 22px; background: var(--ink); color: var(--mute);
+  display: grid; grid-template-columns: repeat(3, 1fr); padding: 15px; gap: 4px; place-items: center;
+  font: 700 38px/1 var(--display); outline: 2px solid transparent; outline-offset: 6px; }
+.die.ready { outline-color: var(--seat); }
+.die.rolling { animation: shake 0.11s linear infinite; }
+.die span { width: 14px; height: 14px; border-radius: 50%; background: transparent; }
+.die span.on { background: var(--bg); }
+.die em { grid-column: 1 / -1; grid-row: 1 / -1; font-style: normal; }
+@keyframes shake { 0% { transform: translate(-2px, 1px); } 50% { transform: translate(2px, -2px); } 100% { transform: translate(-1px, 2px); } }
+.roll { min-width: 140px; padding: 7px 18px; border-radius: 20px; font: 700 16px/1.3 var(--display); color: var(--mute); }
+.roll.ready { background: var(--seat); color: var(--bg); }
+.roll:disabled { cursor: default; }
+.msg { margin: 0; min-height: 2.8em; text-align: center; color: #b8bcc8; text-wrap: balance; }
+@media (max-width: 1010px) {
+  .side { max-width: 560px; grid-template-columns: auto 1fr; align-items: center; gap: 16px 20px; }
+  .side header { display: none; }
+  .msg { text-align: left; min-height: 0; }
+  .seats { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); order: 2; }
+  .seat { padding-block: 4px; }
+  .side > .btn { grid-column: 1 / -1; order: 3; }
+  .die { width: 64px; height: 64px; border-radius: 17px; padding: 11px; font-size: 30px; }
+  .die span { width: 11px; height: 11px; }
+  .dicebox { gap: 10px; }
+  .roll { min-width: 110px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .die.rolling { animation: none; } }
+</style>
+
+</head>
+<body>
+<div id="app">
+  <main id="menu">
+    <h1 class="logo" aria-label="Dragon Ludo"><span style="color:#e8667c">L</span><span style="color:#4dbd98">U</span><span style="color:#edc25e">D</span><span style="color:#5a9bd8">O</span></h1>
+    <p class="sub">Roll a 6 to start. Capture once to unlock home.</p>
+    <div class="modes" id="modes" role="radiogroup" aria-label="Game mode"></div>
+    <div class="colours" id="colours">
+      <span id="colLabel">Your colour</span>
+      <div class="swatches" id="swatches" role="radiogroup" aria-labelledby="colLabel"></div>
+    </div>
+    <div class="settings">
+      <div class="seg" role="radiogroup" aria-label="Game type">
+        <button type="button" id="typeClassic" role="radio">Classic - 4 home</button>
+        <button type="button" id="typeQuick" role="radio">Quick - 1 home</button>
+      </div>
+      <button type="button" class="switch" id="backSwitch" role="switch"><i></i>Backward moves</button>
+    </div>
+    <button type="button" class="play" id="play">Play</button>
+    <p class="keys"><span>Enter play</span><span>1-6 mode</span><span>C / Q game type</span><span>B backward moves</span></p>
+  </main>
+
+  <section id="game" hidden>
+    <div class="boardwrap">
+      <canvas id="board" aria-label="Ludo board"></canvas>
+      <div class="win" id="win" hidden>
+        <div>
+          <h2 id="winText"></h2>
+          <div class="row">
+            <button type="button" class="btn solid" id="again">Play again</button>
+            <button type="button" class="btn" id="winMenu">Back to menu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="side">
+      <header><h2>Dragon Ludo</h2><p id="rules"></p></header>
+      <ol class="seats" id="seats"></ol>
+      <div class="dicebox">
+        <button type="button" class="die" id="die" aria-label="Dice"></button>
+        <button type="button" class="roll" id="roll">Roll</button>
+      </div>
+      <p class="msg" id="msg" aria-live="polite"></p>
+      <button type="button" class="btn" id="back">Back to menu</button>
+    </aside>
+  </section>
+</div>
+
+<script>
+"use strict";
+// ---------- constants (board units: the board is drawn on a 720 x 720 square) ----------
+const S = 44, M = 30, BOARD = S * 15, BW = BOARD + 2 * M, S6 = 38;
+const BG = "#15181f", PANEL = "#1c2029", CELL = "#262b37", EDGE = "#343a48", INK = "#e7e9ef", MUTE = "#8990a1";
+// name, main, light, dark (the last two are only seated on the six-player board)
+const COL = [
+  ["Red", "#e8667c", "#f6c3cc", "#a8475a"],
+  ["Green", "#4dbd98", "#c3ecdf", "#33826a"],
+  ["Yellow", "#edc25e", "#f8e8bd", "#a8873a"],
+  ["Blue", "#5a9bd8", "#c5ddf3", "#3b6b98"],
+  ["Purple", "#9c82e0", "#dcd2f6", "#6a56a3"],
+  ["Orange", "#ee955c", "#f9d6bf", "#a9663b"],
+];
+const START = [0, 13, 26, 39, 52, 65]; // every seat owns a 13-square stretch of track
+const SAFE4 = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+const range = (a, b, step = 1) => { const o = []; for (let v = a; step > 0 ? v < b : v > b; v += step) o.push(v); return o; };
+const PATH = [].concat(
+  range(1, 6).map(c => [6, c]), range(5, -1, -1).map(r => [r, 6]), [[0, 7], [0, 8]],
+  range(1, 6).map(r => [r, 8]), range(9, 15).map(c => [6, c]), [[7, 14], [8, 14]],
+  range(13, 8, -1).map(c => [8, c]), range(9, 15).map(r => [r, 8]), [[14, 7], [14, 6]],
+  range(13, 8, -1).map(r => [r, 6]), range(5, -1, -1).map(c => [8, c]), [[7, 0], [6, 0]]
+);
+const HOME = [
+  range(0, 5).map(k => [7, 1 + k]), range(0, 5).map(k => [1 + k, 7]),
+  range(0, 5).map(k => [7, 13 - k]), range(0, 5).map(k => [13 - k, 7]),
+];
+const YARD = [[0, 0], [9, 0], [9, 9], [0, 9]];
+const SPOTS = [[2, 2], [4, 2], [2, 4], [4, 4]];
+const FIN = [[-0.7, 0], [0, -0.7], [0.7, 0], [0, 0.7]];
+const OFFS = [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]];
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+// name, seats, human seats, board size (4 = square board, 6 = hexagonal board)
+const MODES = [
+  ["You vs Computer", [0, 2], [0], 4],
+  ["You vs 3 Computers", [0, 1, 2, 3], [0], 4],
+  ["2 Players", [0, 2], [0, 2], 4],
+  ["4 Players", [0, 1, 2, 3], [0, 1, 2, 3], 4],
+  ["You vs 5 Computers", [0, 1, 2, 3, 4, 5], [0], 6],
+  ["6 Players", [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5], 6],
+];
+
+function mix(a, b, t) {
+  let out = "#";
+  for (const i of [1, 3, 5]) {
+    const x = parseInt(a.substr(i, 2), 16), y = parseInt(b.substr(i, 2), 16);
+    out += Math.trunc(x + (y - x) * t).toString(16).padStart(2, "0");
+  }
+  return out;
+}
+const mod = (x, n) => ((x % n) + n) % n;
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+// ---------- game state and rules ----------
+const P = { mode: 0, my: 0, quick: false, back: true }; // menu choices
+const G = { state: "menu", gen: 0, t: 0 };
+
+/** Timer for game logic - the call is dropped if that game has ended meanwhile. */
+function later(ms, f) {
+  const g = G.gen;
+  setTimeout(() => { if (g === G.gen) f(); }, ms);
+}
+
+/** Seats, human seats, board size and who starts for mode k, with your colour applied. */
+function table(k) {
+  let [, seats, humans, n] = MODES[k];
+  if (humans.length === n) return [seats, humans, n, seats[0]]; // every colour is a human seat
+  const me = P.my < n ? P.my : 0;
+  if (seats.length === 2) { // you and the seat facing you
+    seats = [me, (me + n / 2) % n].sort((a, b) => a - b);
+    return [seats, humans.length === 2 ? seats : [me], n, me];
+  }
+  return [seats, [me], n, me];
+}
+
+/** Centres of every square for the 4-seat (square) or 6-seat (hexagonal) board.
+    Progress p: -1 yard, 0..last main track, then 5 home-column squares, fin = home. */
+function geom(n) {
+  G.np = n; G.L = 13 * n; G.last = G.L - 2; G.fin = G.L + 4;
+  G.safe = new Set();
+  for (let c = 0; c < n; c++) { G.safe.add(13 * c); G.safe.add(13 * c + 8); }
+  if (n === 4) {
+    G.cs = S;
+    const ctr = ([r, c]) => [M + c * S + S / 2, M + r * S + S / 2];
+    G.gTrack = PATH.map(ctr);
+    G.gHome = HOME.map(h => h.map(ctr));
+    G.gYard = YARD.map(([gx, gy]) => SPOTS.map(([dx, dy]) => [M + (gx + dx) * S, M + (gy + dy) * S]));
+    G.gFin = FIN.map(([fx, fy]) => range(0, 4).map(i => [
+      M + (7.5 + fx + (i % 2 - 0.5) * 0.3) * S, M + (7.5 + fy + (Math.floor(i / 2) - 0.5) * 0.3) * S]));
+    return;
+  }
+  // n arms, 3 squares wide and 6 long, around an n-sided centre; seat c owns arm c
+  const s = G.cs = S6, cx = BW / 2, cy = BW / 2;
+  const ap = 1.5 * s / Math.tan(Math.PI / n); // centre to the foot of an arm
+  G.gAng = range(0, n).map(c => Math.PI + c * 2 * Math.PI / n);
+  const sq = (k, u, v) => { // arm k, u squares out from the centre, lane v (-1, 0, 1)
+    const a = G.gAng[k % n], d = ap + (u + 0.5) * s;
+    return [cx + Math.cos(a) * d - Math.sin(a) * v * s, cy + Math.sin(a) * d + Math.cos(a) * v * s];
+  };
+  G.gTrack = []; G.gRot = [];
+  for (let c = 0; c < n; c++) { // in along arm c, out along arm c + 1, round its tip
+    const cells = [].concat(range(4, -1, -1).map(u => [c, u, 1]), range(0, 6).map(u => [c + 1, u, -1]),
+      [[c + 1, 5, 0], [c + 1, 5, 1]]);
+    for (const [k, u, v] of cells) { G.gTrack.push(sq(k, u, v)); G.gRot.push(G.gAng[k % n]); }
+  }
+  G.gHome = range(0, n).map(c => range(4, -1, -1).map(u => sq(c, u, 0)));
+  G.gYc = []; G.gYard = []; G.gFin = [];
+  for (let c = 0; c < n; c++) { // yards sit in the wedges between the arms
+    let a = G.gAng[c] + Math.PI / n;
+    const x = cx + Math.cos(a) * 6.85 * s, y = cy + Math.sin(a) * 6.85 * s;
+    G.gYc.push([x, y]);
+    G.gYard.push([[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([dx, dy]) => [x + dx * 0.7 * s, y + dy * 0.7 * s]));
+    a = G.gAng[c];
+    G.gFin.push(range(0, 4).map(i => [
+      cx + Math.cos(a) * ap * 0.55 + (i % 2 - 0.5) * 0.3 * s,
+      cy + Math.sin(a) * ap * 0.55 + (Math.floor(i / 2) - 0.5) * 0.3 * s]));
+  }
+}
+
+function xy(c, p, i) {
+  if (p < 0) return G.gYard[c][i];
+  if (p <= G.last) return G.gTrack[(START[c] + p) % G.L];
+  if (p < G.fin) return G.gHome[c][p - G.last - 1];
+  return G.gFin[c][i];
+}
+
+function start(k) {
+  const [seats, humans, n, first] = table(k);
+  G.gen++;
+  G.seats = seats; G.human = new Set(humans);
+  geom(n);
+  G.goal = P.quick ? 1 : 4; G.back = P.back;
+  G.pos = {}; G.killed = {}; // classic rule: no entering home before your first kill
+  for (const c of seats) { G.pos[c] = [-1, -1, -1, -1]; G.killed[c] = false; }
+  G.turn = seats.indexOf(first); G.sixes = 0; G.dice = null; G.legal = [];
+  G.opts = {}; G.moves = []; G.sel = null;
+  G.ov = null; G.winner = null; G.msg = ""; G.dragon = null; G.state = "game";
+  G.boardDirty = true;
+  beginTurn();
+}
+
+const cur = () => G.seats[G.turn];
+
+function beginTurn() {
+  const c = cur();
+  G.phase = "roll";
+  G.msg = COL[c][0] + "'s turn" + (G.human.has(c) ? " - tap the dice to roll" : "");
+  if (!G.human.has(c)) later(800, roll);
+}
+
+function humanRoll() {
+  if (G.state === "game" && G.winner === null && G.phase === "roll" && G.human.has(cur())) roll();
+}
+
+function roll() {
+  if (G.phase !== "roll") return;
+  G.phase = "rolling";
+  spin(0);
+}
+
+function spin(k) {
+  G.dice = 1 + Math.floor(Math.random() * 6);
+  if (k < 12) later(55, () => spin(k + 1));
+  else afterRoll();
+}
+
+function can(c, i, d) {
+  const p = G.pos[c][i];
+  if (p < 0) return d === 6;
+  if (p <= G.last && p + d > G.last && !G.killed[c]) return false; // home stays closed until you capture
+  return p + d <= G.fin;
+}
+
+function afterRoll() {
+  const c = cur(), d = G.dice;
+  G.sixes = d === 6 ? G.sixes + 1 : 0;
+  if (G.sixes === 3) {
+    G.msg = "Three sixes in a row - turn lost!";
+    G.phase = "wait";
+    later(1200, () => nextTurn(false));
+    return;
+  }
+  G.opts = {}; G.sel = null; G.legal = []; G.moves = [];
+  for (let i = 0; i < 4; i++) {
+    const p = G.pos[c][i];
+    const dirs = can(c, i, d) ? [1] : [];
+    if (G.back && p >= 0 && p <= G.last && p - d >= 0) dirs.push(-1); // optional backward move on the main track
+    if (dirs.length) { G.opts[i] = dirs; G.legal.push(i); for (const dr of dirs) G.moves.push([i, dr]); }
+  }
+  if (!G.moves.length) {
+    const gate = !G.killed[c] && G.pos[c].some(q => q >= 0 && q <= G.last && q + d > G.last && q + d <= G.fin);
+    G.msg = COL[c][0] + " rolled " + d + " - " + (gate ? "capture a goti to enter home!" : "no moves");
+    G.phase = "wait";
+    later(1000, () => nextTurn(false));
+  } else if (G.moves.length === 1 || !G.human.has(c)) {
+    const [i, dr] = G.moves.length === 1 ? G.moves[0] : ai(c, d);
+    G.phase = "wait";
+    later(450, () => move(i, dr));
+  } else {
+    G.phase = "pick";
+    G.msg = "Pick a goti to move";
+  }
+}
+
+/** Chance (0-1) that an opponent can capture colour c's goti at progress p on their next roll. */
+function danger(c, p) {
+  if (p < 0 || p > G.last) return 0;
+  const a = (START[c] + p) % G.L;
+  if (G.safe.has(a)) return 0;
+  const gaps = new Set();
+  for (const o of G.seats) {
+    if (o === c) continue;
+    const t = mod(a - START[o], G.L); // how far the opponent must travel to reach this square
+    if (t > G.last) continue; // they turn into their home column before getting here
+    for (const q of G.pos[o]) if (q >= 0 && q <= G.last && t - q >= 1 && t - q <= 6) gaps.add(t - q);
+  }
+  return gaps.size / 6;
+}
+
+/** Scores every legal move: captures, escaping danger, safe squares, threats and progress. */
+function ai(c, d) {
+  const pos = G.pos[c];
+  const onBoard = pos.filter(q => q >= 0 && q < G.fin).length;
+  const quick = G.goal === 1, lead = Math.max(...pos), need = !G.killed[c];
+  const rk = quick ? 2.0 : 1.4; // in a quick game losing the leader is fatal
+  let best = G.moves[0], bs = -1e9;
+  for (const [i, dr] of G.moves) {
+    const p = pos[i], n = p < 0 ? 0 : p + dr * d;
+    let s = Math.random() * 0.5;
+    if (p < 0) s += onBoard === 0 ? 80 : quick ? 20 : onBoard === 1 ? 45 : 30;
+    else {
+      s += dr * d * 0.6 + (quick && dr > 0 && p === lead ? 25 + d * 1.5 : 0); // quick: race one goti
+      s += danger(c, p) * (p + 12) * rk; // run away from a threatened square
+    }
+    s += n * 0.25;
+    if (n === G.fin) s += 70;
+    else if (n > G.last) s += 30; // inside the home column: untouchable
+    else {
+      const a = (START[c] + n) % G.L;
+      if (G.safe.has(a) && dr > 0) s += 22; // never retreat just to sit on a star
+      for (const o of G.seats) {
+        if (o === c) continue;
+        for (const q of G.pos[o]) {
+          if (!(q >= 0 && q <= G.last)) continue;
+          const oa = (START[o] + q) % G.L, gap = mod(oa - a, G.L);
+          if (oa === a && !G.safe.has(a)) s += 70 + q * (quick ? 2.6 : 1.8) + (need ? 60 : 0); // capture
+          else if (dr > 0 && !G.safe.has(oa) && gap >= 1 && gap <= 6 && n + gap <= G.last)
+            s += (12 + q * 0.5) * (need ? 2 : 1); // sit just behind them to threaten next turn
+        }
+      }
+      s -= danger(c, n) * (n + 12) * rk; // don't step into the line of fire
+    }
+    if (s > bs) { best = [i, dr]; bs = s; }
+  }
+  return best;
+}
+
+function move(i, dr) {
+  const c = cur(), d = G.dice;
+  G.phase = "anim"; G.legal = []; G.sel = null;
+  hop(c, i, G.pos[c][i] < 0 ? 1 : d, () => landed(c, i, d, dr), dr);
+}
+
+function hop(c, i, steps, done, dr) {
+  if (steps === 0) return done();
+  const p = G.pos[c][i], q = p < 0 ? 0 : p + dr;
+  const [x0, y0] = xy(c, p, i), [x1, y1] = xy(c, q, i);
+  const f = k => {
+    const t = k / 6;
+    G.ov = [c, i, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - Math.sin(t * Math.PI) * 12];
+    if (k < 6) later(16, () => f(k + 1));
+    else { G.pos[c][i] = q; G.ov = null; later(20, () => hop(c, i, steps - 1, done, dr)); }
+  };
+  f(1);
+}
+
+function landed(c, i, d, dr) {
+  const p = G.pos[c][i];
+  let extra = d === 6;
+  const caps = [];
+  G.msg = COL[c][0] + " rolled " + d + (dr < 0 ? " and went back" : "");
+  if (p >= 0 && p <= G.last) {
+    const a = (START[c] + p) % G.L;
+    if (!G.safe.has(a)) {
+      for (const o of G.seats) {
+        if (o === c) continue;
+        G.pos[o].forEach((q, j) => {
+          if (q >= 0 && q <= G.last && (START[o] + q) % G.L === a) {
+            caps.push([o, j]); extra = true;
+            G.msg = COL[c][0] + " captured a " + COL[o][0] + " goti!";
+          }
+        });
+      }
+    }
+  }
+  if (caps.length) {
+    if (!G.killed[c]) G.msg += " Home is open!";
+    G.killed[c] = true;
+  }
+  if (p === G.fin) {
+    extra = true;
+    G.msg = COL[c][0] + " goti is home!";
+    if (G.pos[c].filter(q => q === G.fin).length >= G.goal) { G.winner = c; return; }
+  }
+  if (caps.length) {
+    const [x, y] = xy(c, p, i);
+    startDragon(caps, x, y, extra); // a dragon torches the captured goti
+    return;
+  }
+  G.phase = "wait";
+  later(400, () => nextTurn(extra));
+}
+
+function nextTurn(extra) {
+  if (!extra) { G.turn = (G.turn + 1) % G.seats.length; G.sixes = 0; }
+  beginTurn();
+}
+
+// ---------- dragon capture animation ----------
+const FLAME = ["#ffd166", "#ff9f1c", "#ff4d2e"];
+function startDragon(caps, x, y, extra) {
+  const sp = range(0, 18).map(() => [rnd(-3, 3), rnd(-5, -1.2), FLAME[Math.floor(Math.random() * 3)]]);
+  G.dragon = { f: 0, x, y, caps, extra, sp };
+  G.phase = "dragon";
+}
+function stepDragon() { // one frame every 40 ms
+  const D = G.dragon;
+  D.f++;
+  if (D.f === 23) for (const [o, j] of D.caps) G.pos[o][j] = -1; // the victim is burnt and sent back home
+  if (D.f >= 46) { G.dragon = null; G.phase = "wait"; later(200, () => nextTurn(D.extra)); }
+}
+
+/** One logic step (25 per second): the pulse clock and the dragon. */
+function tick() {
+  G.t += 0.25;
+  if (G.state === "game" && G.dragon) stepDragon();
+}
+
+// ---------- player input on the board (x, y in board units) ----------
+function boardClick(x, y) {
+  if (G.state !== "game" || G.winner !== null) return;
+  const c = cur();
+  if (G.phase === "pick") {
+    let best = null, bd = G.cs * 0.85;
+    for (const i of G.legal) {
+      const [tx, ty] = xy(c, G.pos[c][i], i), d = Math.hypot(tx - x, ty - y);
+      if (d < bd) { best = i; bd = d; }
+    }
+    if (best !== null) {
+      if (G.opts[best].length === 1) move(best, G.opts[best][0]);
+      else { G.sel = best; G.phase = "dir"; G.msg = "Tap a marker: forward (+) or backward (-)"; }
+    }
+  } else if (G.phase === "dir") {
+    const i = G.sel;
+    for (const dr of G.opts[i]) {
+      const [gx, gy] = xy(c, G.pos[c][i] + dr * G.dice, i);
+      if (Math.hypot(gx - x, gy - y) < G.cs * 0.75) { move(i, dr); return; }
+    }
+    G.sel = null; G.phase = "pick"; G.msg = "Pick a goti to move";
+  }
+}
+
+// ======================= everything below needs a browser =======================
+if (typeof document !== "undefined") (function () {
+  const $ = id => document.getElementById(id);
+  const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const pulse = () => (still ? 0 : Math.sin(G.t));
+
+  // ---------- remembered menu choices (this browser only) ----------
+  try {
+    const saved = JSON.parse(localStorage.getItem("ludo-prefs") || "{}");
+    if (Number.isInteger(saved.mode) && saved.mode >= 0 && saved.mode < MODES.length) P.mode = saved.mode;
+    if (Number.isInteger(saved.my) && saved.my >= 0 && saved.my < 6) P.my = saved.my;
+    if (typeof saved.quick === "boolean") P.quick = saved.quick;
+    if (typeof saved.back === "boolean") P.back = saved.back;
+  } catch (e) { /* storage unavailable - defaults are fine */ }
+  const save = () => { try { localStorage.setItem("ludo-prefs", JSON.stringify(P)); } catch (e) { /* ignore */ } };
+
+  // ---------- menu ----------
+  const pawnHTML = c => c === null ? '<span class="pawn"></span>'
+    : `<span class="pawn" style="--c:${COL[c][1]};--i:${COL[c][2]}"></span>`;
+  function renderMenu() {
+    $("modes").innerHTML = MODES.map(([name], k) => {
+      let [seats, humans, , me] = table(k);
+      seats = seats.slice().sort((a, b) => (a !== me) - (b !== me) || a - b); // your pawn comes first
+      const who = seats.map(c => pawnHTML(humans.includes(c) ? c : null)).join("");
+      return `<button type="button" class="mode" role="radio" aria-checked="${k === P.mode}" data-k="${k}">` +
+        `<span class="pawns" data-n="${seats.length}">${who}</span><span class="name">${name}</span></button>`;
+    }).join("");
+    const [, humans, n, me] = table(P.mode);
+    $("colours").style.visibility = humans.length < n ? "visible" : "hidden"; // nothing to choose at a full table
+    $("colLabel").textContent = humans.length === 1 ? "Your colour" : "Player 1";
+    $("swatches").innerHTML = range(0, n).map(c =>
+      `<button type="button" class="swatch" role="radio" aria-checked="${c === me}" aria-label="${COL[c][0]}" ` +
+      `data-c="${c}" style="--c:${COL[c][1]}"></button>`).join("");
+    $("typeClassic").setAttribute("aria-checked", !P.quick);
+    $("typeQuick").setAttribute("aria-checked", P.quick);
+    $("backSwitch").setAttribute("aria-checked", P.back);
+  }
+  function setPref(key, value) { P[key] = value; save(); renderMenu(); }
+  $("modes").addEventListener("click", e => {
+    const b = e.target.closest(".mode");
+    if (b) setPref("mode", +b.dataset.k);
+  });
+  $("swatches").addEventListener("click", e => {
+    const b = e.target.closest(".swatch");
+    if (b) setPref("my", +b.dataset.c);
+  });
+  $("typeClassic").addEventListener("click", () => setPref("quick", false));
+  $("typeQuick").addEventListener("click", () => setPref("quick", true));
+  $("backSwitch").addEventListener("click", () => setPref("back", !P.back));
+
+  function showMenu() {
+    G.state = "menu"; G.winner = null;
+    G.gen++; // cancels timers left over from the game we just quit
+    $("game").hidden = true; $("menu").hidden = false;
+    renderMenu();
+  }
+  function play() {
+    start(P.mode);
+    $("menu").hidden = true; $("game").hidden = false; $("win").hidden = true;
+    $("rules").textContent = (P.quick ? "Quick" : "Classic") + " - backward moves " + (P.back ? "on" : "off");
+    lastPanel = "";
+    resize();
+    window.scrollTo(0, 0);
+  }
+  $("play").addEventListener("click", play);
+  $("again").addEventListener("click", play);
+  $("back").addEventListener("click", showMenu);
+  $("winMenu").addEventListener("click", showMenu);
+  $("die").addEventListener("click", humanRoll);
+  $("roll").addEventListener("click", humanRoll);
+  document.addEventListener("keydown", e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const onButton = e.target instanceof HTMLButtonElement; // buttons already act on Enter / Space
+    if (G.state === "menu") {
+      if (e.key === "Enter" && !onButton) play();
+      else if (e.key >= "1" && e.key <= String(MODES.length)) setPref("mode", +e.key - 1);
+      else if (e.key === "b" || e.key === "B") setPref("back", !P.back);
+      else if (e.key === "q" || e.key === "Q") setPref("quick", true);
+      else if (e.key === "c" || e.key === "C") setPref("quick", false);
+    } else if (e.key === " " && !onButton) { e.preventDefault(); humanRoll(); }
+  });
+
+  // ---------- canvas helpers ----------
+  const cv = $("board"), ctx = cv.getContext("2d");
+  let layer = document.createElement("canvas"), k = 1; // static board layer and px-per-unit scale
+  function rr(g, x0, y0, x1, y1, r, fill, stroke, lw) {
+    g.beginPath();
+    g.moveTo(x0 + r, y0);
+    g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
+    g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); }
+  }
+  function disc(g, x, y, r, fill, stroke, lw) {
+    g.beginPath(); g.arc(x, y, Math.max(0.1, r), 0, Math.PI * 2);
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); }
+  }
+  function poly(g, pts, fill, stroke, lw) {
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.lineJoin = "round"; g.stroke(); }
+  }
+  function star(g, x, y, R, fill) {
+    poly(g, range(0, 10).map(i => {
+      const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? R * 0.45 : R;
+      return [x + r * Math.cos(a), y + r * Math.sin(a)];
+    }), fill);
+  }
+  function text(g, x, y, str, size, fill) {
+    g.font = `700 ${size}px "Baloo 2", "Trebuchet MS", sans-serif`;
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = fill;
+    g.fillText(str, x, y);
+  }
+  function pawn(g, x, y, r, fill, inner) {
+    disc(g, x, y, r, fill, BG, 2);
+    disc(g, x, y, r * 0.4, inner);
+  }
+
+  // ---------- static board ----------
+  function drawBoard(g) {
+    g.clearRect(0, 0, BW, BW);
+    if (G.np !== 4) return drawHex(g);
+    rr(g, M - 14, M - 14, M + BOARD + 14, M + BOARD + 14, 30, PANEL);
+    const cell = (r, c, fill) => rr(g, M + c * S + 2, M + r * S + 2, M + c * S + S - 2, M + r * S + S - 2, 8, fill);
+    for (let c = 0; c < 4; c++) { // yards: a tinted plate with four wells
+      const [gx, gy] = YARD[c], x0 = M + gx * S, y0 = M + gy * S, main = COL[c][1];
+      rr(g, x0 + 10, y0 + 10, x0 + 6 * S - 10, y0 + 6 * S - 10, 26, mix(main, PANEL, 0.86), mix(main, PANEL, 0.5), 2);
+      for (const [dx, dy] of SPOTS)
+        disc(g, M + (gx + dx) * S, M + (gy + dy) * S, S * 0.42, PANEL, mix(main, PANEL, 0.55), 2);
+    }
+    PATH.forEach(([r, c], i) => {
+      const pc = START.indexOf(i) < 4 ? START.indexOf(i) : -1;
+      cell(r, c, pc >= 0 ? mix(COL[pc][1], PANEL, 0.2) : CELL);
+      if (SAFE4.has(i)) star(g, M + c * S + S / 2, M + r * S + S / 2, S * 0.22, pc >= 0 ? PANEL : MUTE); // safe squares
+    });
+    HOME.forEach((h, pc) => h.forEach(([r, c]) => cell(r, c, mix(COL[pc][1], PANEL, 0.6))));
+    const x0 = M + 6 * S, x1 = M + 9 * S, cx = M + 7.5 * S;
+    [[x0, x0, x0, x1], [x0, x0, x1, x0], [x1, x0, x1, x1], [x0, x1, x1, x1]].forEach((p, pc) =>
+      poly(g, [[p[0], p[1]], [p[2], p[3]], [cx, cx]], mix(COL[pc][1], PANEL, 0.2), PANEL, 3));
+  }
+  function drawHex(g) {
+    const s = G.cs, n = G.np, cx = BW / 2, cy = BW / 2;
+    disc(g, cx, cy, BW / 2 - 14, PANEL);
+    const cell = (x, y, a, fill) => { // rounded square turned to face along its arm
+      const h = s / 2 - 2;
+      g.save(); g.translate(x, y); g.rotate(a);
+      rr(g, -h, -h, h, h, 7, fill);
+      g.restore();
+    };
+    for (let c = 0; c < n; c++) { // yards: a tinted disc with four wells
+      const [x, y] = G.gYc[c], main = COL[c][1];
+      disc(g, x, y, 1.85 * s, mix(main, PANEL, 0.86), mix(main, PANEL, 0.5), 2);
+      for (const [wx, wy] of G.gYard[c]) disc(g, wx, wy, s * 0.42, PANEL, mix(main, PANEL, 0.55), 2);
+    }
+    G.gTrack.forEach(([x, y], i) => {
+      const pc = i % 13 === 0 ? i / 13 : -1;
+      cell(x, y, G.gRot[i], pc >= 0 ? mix(COL[pc][1], PANEL, 0.2) : CELL);
+      if (G.safe.has(i)) star(g, x, y, s * 0.22, pc >= 0 ? PANEL : MUTE); // safe squares carry a quiet star
+    });
+    G.gHome.forEach((h, c) => h.forEach(([x, y]) => cell(x, y, G.gAng[c], mix(COL[c][1], PANEL, 0.6))));
+    const rv = 1.5 * s / Math.sin(Math.PI / n), h = Math.PI / n;
+    for (let c = 0; c < n; c++) { // centre: one wedge per colour
+      const a = G.gAng[c];
+      poly(g, [[cx, cy], [cx + rv * Math.cos(a - h), cy + rv * Math.sin(a - h)],
+        [cx + rv * Math.cos(a + h), cy + rv * Math.sin(a + h)]], mix(COL[c][1], PANEL, 0.2), PANEL, 3);
+    }
+  }
+
+  // ---------- moving parts ----------
+  function token(g, c, i, x, y, r) {
+    if ((G.phase === "pick" && c === cur() && G.legal.includes(i)) ||
+        (G.phase === "dir" && c === cur() && i === G.sel))
+      disc(g, x, y, r + 4 + 2 * pulse(), null, INK, 2); // ring around the gotis you can move
+    pawn(g, x, y, r, COL[c][1], COL[c][2]);
+  }
+  function drawDyn(g) {
+    const s = G.cs, c0 = cur();
+    if (G.winner === null) { // outline around the yard of whoever is to move
+      if (G.np !== 4) disc(g, G.gYc[c0][0], G.gYc[c0][1], 1.85 * s + 6 + 2 * pulse(), null, COL[c0][1], 2);
+      else {
+        const [gx, gy] = YARD[c0], e = 3 + 2 * pulse();
+        rr(g, M + gx * S + 3 - e, M + gy * S + 3 - e, M + (gx + 6) * S - 3 + e, M + (gy + 6) * S - 3 + e, 30, null, COL[c0][1], 2);
+      }
+    }
+    const groups = new Map(); // gotis sharing a square are shrunk and fanned out
+    for (const c of G.seats) G.pos[c].forEach((p, i) => {
+      if (G.ov && G.ov[0] === c && G.ov[1] === i) return;
+      const [x, y] = xy(c, p, i);
+      const key = p >= 0 && p < G.fin ? Math.round(x) + "," + Math.round(y) : c + ":" + i;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push([c, i, x, y, p]);
+    });
+    const items = [];
+    for (const grp of groups.values()) grp.forEach(([c, i, x, y, p], j) => {
+      const n = grp.length, r = p === G.fin ? s * 0.24 : n === 1 ? s * 0.36 : s * 0.26;
+      if (n > 1) { x += OFFS[j % 4][0] * s; y += OFFS[j % 4][1] * s; }
+      items.push([y, c, i, x, r]);
+    });
+    items.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    for (const [y, c, i, x, r] of items) token(g, c, i, x, y, r);
+    if (G.ov) token(g, G.ov[0], G.ov[1], G.ov[2], G.ov[3], s * 0.4);
+    if (G.phase === "dir" && G.sel !== null) { // where the chosen goti can go
+      const i = G.sel;
+      for (const dr of G.opts[i]) {
+        const [x, y] = xy(c0, G.pos[c0][i] + dr * G.dice, i);
+        g.setLineDash([5, 3]);
+        disc(g, x, y, s * 0.4 + 2 * pulse(), dr > 0 ? COL[c0][1] : COL[c0][3], "#ffffff", 3);
+        g.setLineDash([]);
+        text(g, x, y + 1, (dr > 0 ? "+" : "-") + G.dice, 16, "#ffffff");
+      }
+    }
+    if (G.dragon && G.dragon.f > 0) drawDragon(g);
+  }
+  function drawDragon(g) {
+    const D = G.dragon, f = D.f, N = 46, HIT = 23, tx = D.x, ty = D.y;
+    const path = u => { // swoops in from the left, over the target, away right
+      if (u < 0.5) { const a = u / 0.5; return [-150 + (tx + 150) * a, ty - 40 - 190 * (1 - a) ** 2]; }
+      const b = (u - 0.5) / 0.5;
+      return [tx + (BW + 170 - tx) * b, ty - 40 - 190 * b * b];
+    };
+    const u = f / N;
+    let [x, y] = path(u);
+    const [xa, ya] = path(Math.max(0, u - 0.02)), [xb, yb] = path(Math.min(1, u + 0.02));
+    const ang = Math.atan2(yb - ya, xb - xa), cs = Math.cos(ang), sn = Math.sin(ang), sc = 1.1;
+    y += Math.sin(f * 0.6) * 6;
+    const fl = 0.5 + 0.5 * Math.sin(f * 0.7), firing = f >= 14 && f <= 30;
+    const Pt = (px, py) => [x + (px * cs - py * sn) * sc, y + (px * sn + py * cs) * sc];
+    const shape = (pts, fill, stroke, w) => poly(g, pts.map(q => Pt(q[0], q[1])), fill, stroke, w || 2);
+    const wing = (ox, m, fill) => {
+      const t1 = [ox - 92 * m, -14 - 62 * fl * m], t2 = [ox - 52 * m, -18 - 92 * fl * m], t3 = [ox - 8 * m, -14 - 78 * fl * m];
+      const s1 = [(t1[0] + t2[0]) / 2 + 10, (t1[1] + t2[1]) / 2 + 22], s2 = [(t2[0] + t3[0]) / 2 + 6, (t2[1] + t3[1]) / 2 + 22];
+      shape([[ox - 14, -10], t1, s1, t2, s2, t3, [ox + 8, -10]], fill, "#5a0d1b", 2);
+    };
+    if (f >= HIT && f < HIT + 16) { // impact: flames, shockwave, sparks and a label where the goti was burnt
+      const q = f - HIT;
+      disc(g, tx, ty, 10 + q * 3.2, null, "#ff9f1c", Math.max(1, 6 - Math.floor(q / 3)));
+      for (let n = 0; n < 8; n++) {
+        const a = n * Math.PI / 4 + q * 0.2, dist = q * 2.4;
+        disc(g, tx + Math.cos(a) * dist, ty + Math.sin(a) * dist - q * 1.5, Math.max(2, 14 - q * 0.7), FLAME[(n + q) % 3]);
+      }
+      for (const [vx, vy, col] of D.sp) disc(g, tx + vx * q * 2.4, ty + vy * q * 2.4 + 0.12 * q * q, 3, col);
+      text(g, tx + 1, ty - 29 - q * 1.5, "BURNED!", 17, BG);
+      text(g, tx, ty - 30 - q * 1.5, "BURNED!", 17, "#ffd166");
+    }
+    const jo = firing ? 9 : 0, [mx, my] = Pt(94, 2 + jo / 2);
+    if (firing) for (let i = 13; i >= 0; i--) { // fire stream from mouth to target
+      const t = i / 13;
+      disc(g, mx + (tx - mx) * t + rnd(-5, 5) * t, my + (ty - my) * t + rnd(-5, 5) * t, 5 + 15 * t, FLAME[(i + f) % 3]);
+    }
+    wing(10, 0.8, "#9b1d33");
+    for (let n = 0; n < 14; n++) { // serpentine body with spikes
+      const px = -105 + n * 11.5, py = 9 * Math.sin(f * 0.45 - n * 0.55) * (1 - n / 22);
+      const r = (n <= 9 ? 4 + 11 * Math.sin(Math.min(n / 9, 1) * Math.PI / 2) : 15 - (n - 9) * 1.4) * sc;
+      const [bx, by] = Pt(px, py);
+      disc(g, bx, by, r, n % 2 ? "#2fbf71" : "#27a862", "#14663a", 2);
+      if (n % 2 === 1 && n <= 11)
+        shape([[px - 4, py - r / sc + 2], [px + 1, py - r / sc - 9], [px + 6, py - r / sc + 2]], "#ffd166", "#b88a12", 1);
+    }
+    const hx = -105 + 13 * 11.5 + 6, hy = 9 * Math.sin(f * 0.45 - 13 * 0.55) * (1 - 13 / 22);
+    shape([[hx, hy + 7], [hx + 38, hy + 7 + jo], [hx + 36, hy + 13 + jo], [hx - 2, hy + 12]], "#1e8f50", "#14663a");
+    shape([[hx - 6, hy - 11], [hx + 20, hy - 9], [hx + 42, hy - 2], [hx + 42, hy + 3], [hx + 18, hy + 7], [hx - 6, hy + 10]], "#35d07f", "#14663a");
+    shape([[hx - 4, hy - 9], [hx - 30, hy - 27], [hx - 12, hy - 7]], "#f4e4bc", "#b8a46a", 1);
+    shape([[hx + 4, hy - 10], [hx - 18, hy - 30], [hx + 2, hy - 7]], "#f4e4bc", "#b8a46a", 1);
+    const [ex, ey] = Pt(hx + 14, hy - 4);
+    disc(g, ex, ey, 5, "#ffffff", "#14663a", 1);
+    disc(g, ex + 0.5, ey + 0.5, 2.5, "#d7263d");
+    wing(-6, 1.0, "#d7263d");
+  }
+
+  // ---------- side panel ----------
+  const lock = (open, col) =>
+    `<svg width="16" height="18" viewBox="0 0 16 18" aria-hidden="true"><path d="${open ? "M9 8V5a3 3 0 0 1 6 0" : "M5 8V5a3 3 0 0 1 6 0v3"}" ` +
+    `fill="none" stroke="${col}" stroke-width="2"/><rect x="2" y="8" width="12" height="9" rx="2.5" fill="${col}"/></svg>`;
+  let lastPanel = "", lastDie = "";
+  function renderPanel() {
+    const c0 = cur(), over = G.winner !== null;
+    const ready = G.phase === "roll" && G.human.has(c0) && !over;
+    const seats = G.seats.map(c => {
+      const act = c === c0 && !over, human = G.human.has(c);
+      const sub = act ? (human ? "Your turn" : "Thinking...") : human ? (G.human.size === 1 ? "You" : "Human") : "Computer";
+      const home = G.pos[c].filter(q => q === G.fin).length;
+      const dots = range(0, G.goal).map(j => `<i class="${j < home ? "in" : ""}"></i>`).join("");
+      return `<li class="seat" style="--c:${COL[c][1]}"${act ? ' aria-current="true"' : ""}>${pawnHTML(c)}` +
+        `<span><b>${COL[c][0]}</b><small>${sub}</small></span>${lock(G.killed[c], G.killed[c] ? COL[c][1] : "#4a5062")}` +
+        `<span class="homes" title="${home} of ${G.goal} home">${dots}</span></li>`;
+    }).join("");
+    const label = over ? "Game over" : ({
+      roll: G.human.has(c0) ? "Roll" : "Computer's turn", rolling: "Rolling...", pick: "Pick a goti",
+      dir: "Forward or back?", dragon: "Dragon attack!" })[G.phase] || "Moving...";
+    const sig = seats + "|" + label + "|" + ready + "|" + G.msg + "|" + c0 + "|" + over;
+    if (sig !== lastPanel) {
+      lastPanel = sig;
+      $("seats").innerHTML = seats;
+      $("game").style.setProperty("--seat", COL[over ? G.winner : c0][1]);
+      const roll = $("roll");
+      roll.textContent = label; roll.disabled = !ready; roll.classList.toggle("ready", ready);
+      $("die").classList.toggle("ready", ready);
+      $("msg").textContent = G.msg;
+      if (over && $("win").hidden) { $("winText").textContent = COL[G.winner][0] + " wins!"; $("win").hidden = false; }
+    }
+    const die = G.dice + "|" + (G.phase === "rolling");
+    if (die !== lastDie) {
+      lastDie = die;
+      const el = $("die");
+      el.classList.toggle("rolling", G.phase === "rolling");
+      el.setAttribute("aria-label", G.dice ? "Dice showing " + G.dice : "Dice - not rolled yet");
+      el.innerHTML = G.dice === null ? "<em>?</em>"
+        : range(0, 9).map(i => `<span class="${PIPS[G.dice].includes(i) ? "on" : ""}"></span>`).join("");
+    }
+  }
+
+  // ---------- frame loop ----------
+  function resize() {
+    const w = cv.clientWidth;
+    if (!w) return;
+    const px = Math.round(w * Math.min(window.devicePixelRatio || 1, 2.5));
+    if (cv.width !== px) { cv.width = cv.height = px; layer.width = layer.height = px; G.boardDirty = true; }
+    k = px / BW;
+  }
+  function frame() {
+    if (G.state === "game" && cv.width) {
+      if (G.boardDirty) {
+        const g = layer.getContext("2d");
+        g.setTransform(k, 0, 0, k, 0, 0);
+        drawBoard(g);
+        G.boardDirty = false;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(layer, 0, 0);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      drawDyn(ctx);
+      renderPanel();
+    }
+    requestAnimationFrame(frame);
+  }
+  cv.addEventListener("click", e => {
+    const r = cv.getBoundingClientRect();
+    boardClick((e.clientX - r.left) * BW / r.width, (e.clientY - r.top) * BW / r.height);
+  });
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(cv);
+  window.addEventListener("resize", resize);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { G.boardDirty = true; });
+  setInterval(tick, 40);
+  renderMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
